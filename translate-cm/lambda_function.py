@@ -29,7 +29,7 @@ def lambda_handler(event, context):
                 data = s3.get_object(Bucket=bucket, Key=s3_object)
                 textToTranslate = data['Body'].read()
                 english = translate.translate_text(Text=textToTranslate, SourceLanguageCode="auto", TargetLanguageCode="en")
-				sourceLang = str(english['SourceLanguageCode'])
+                sourceLang = str(english['SourceLanguageCode'])
                 entities = comprehendmedical.detect_entities(Text = str(english['TranslatedText']) )
                 entity_str=entities['Entities']
                 
