@@ -1,0 +1,358 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation Template for Translate/Comprehend Medical Solution
+Parameters: 
+  AllowedIPs: 
+    Type: String
+    Description: Enter the CIDR range of IPs that should be allowed access to the API
+  CodeBucket:
+    Type: String
+    Description:  Bucket containing lambda code for Translate/CM solution
+Resources:
+  ResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          -
+            ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  
+  AthenaBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: !Sub ${ResultsBucket}-athenaresults
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          -
+            ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    DependsOn: ResultsBucket
+
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaRoleS3Policy: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "translate-cm-s3"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+              - "s3:ListBucket"
+            Resource: "*"
+          - 
+            Effect: "Allow"
+            Action: "s3:PutObject"
+            Resource: !Sub ${ResultsBucket.Arn}/*          
+      Roles: 
+        - 
+          Ref: "LambdaRole"
+    DependsOn: 
+      - LambdaRole
+      - ResultsBucket
+
+  LambdaRoleTranslatePolicy: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "translate-cm-translate-comprehend"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Action:
+              - "translate:TranslateText"
+              - "comprehend:DetectDominantLanguage"
+              - "cloudwatch:GetMetricStatistics"
+              - "cloudwatch:ListMetrics"
+            Resource: "*"
+      Roles: 
+        - 
+          Ref: "LambdaRole"
+    DependsOn: LambdaRole
+
+  LambdaRoleComprehendMedicalPolicy: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "translate-cm-CompMedical"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Action:
+              - "comprehendmedical:DetectEntitiesV2"
+              - "comprehendmedical:DetectEntities"
+              - "comprehendmedical:DetectPHI"
+            Resource: "*"
+      Roles: 
+        - 
+          Ref: "LambdaRole"
+    DependsOn: LambdaRole
+
+  ApiGatewayCloudWatchLogsRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Policies:
+        -
+          PolicyName: "ApiGatewayLogsPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                Resource: "*"
+
+  AthenaLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Policies:
+        -
+          PolicyName: "AthenaCreatePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "athena:StartQueryExecution"
+                  - "glue:GetDatabase"
+                  - "glue:CreateDatabase"
+                  - "glue:GetTable"
+                  - "glue:CreateTable"
+                Resource: "*"
+        -
+          PolicyName: "AthenaS3Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:ListMultipartUploadParts"
+                  - "s3:AbortMultipartUpload"
+                  - "s3:CreateBucket"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub ${ResultsBucket.Arn}
+                  - !Sub ${ResultsBucket.Arn}/*
+                  - !Sub ${AthenaBucket.Arn}
+                  - !Sub ${AthenaBucket.Arn}/*
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    DependsOn:
+      - ResultsBucket
+      - AthenaBucket
+
+  AthenaLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "Translate-ComprehendMedical-CreateAthenaDB"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 128
+      Role: !Sub ${AthenaLambdaRole.Arn}
+      Runtime: "python2.7"
+      Timeout: 300
+      Environment:
+        Variables:
+          RESULTS_BUCKET: !Sub s3://${ResultsBucket}/results
+          ATHENA_BUCKET: !Sub s3://${AthenaBucket}
+      Code:
+        S3Bucket: !Sub ${CodeBucket}
+        S3Key: "translate-cm-athena.zip"
+    DependsOn: 
+      - AthenaLambdaRole
+
+  AthenaLambdaCustomResource:
+    Type: Custom::AthenaLambdaCustomResource
+    Properties:
+      ServiceToken: !Sub ${AthenaLambda.Arn}
+    DependsOn: AthenaLambda
+
+  TranslateCMLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "Translate-ComprehendMedical"
+      Handler: "lambda_function.lambda_handler"
+      MemorySize: 128
+      Role: !Sub ${LambdaRole.Arn}
+      Runtime: "python2.7"
+      Timeout: 300
+      Environment:
+        Variables:
+          RESULTS_BUCKET: !Sub ${ResultsBucket}
+      Code:
+        S3Bucket: !Sub ${CodeBucket}
+        S3Key: "translate-cm.zip"
+    DependsOn: 
+      - LambdaRole
+      - ResultsBucket
+
+  TranslateCMAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "translate-cm-api"
+      FailOnWarnings: true
+      Policy: !Sub
+         '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "*",
+                "Resource": [
+                  "arn:aws:execute-api:${AWS::Region}:*:*/PROD/GET/*"
+              ]
+            },
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "*",
+              "Resource": [
+                  "arn:aws:execute-api:${AWS::Region}:*:*/PROD/GET/*"
+              ],
+              "Condition": {
+                  "NotIpAddress": {
+                      "aws:SourceIp": "${AllowedIPs}"
+                  }
+              }
+            }
+          ]
+        }'
+  
+  APIGatewayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Sub ${TranslateCMLambda.Arn}
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TranslateCMAPI}/*'
+
+  APIGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TranslateCMAPI
+      ParentId: !Sub ${TranslateCMAPI.RootResourceId}
+      PathPart: translateCM
+
+  APIGatewayRequestValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      RestApiId: !Ref TranslateCMAPI
+      ValidateRequestParameters: true
+
+  APIGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: "None"
+      HttpMethod: "GET"
+      Integration:
+        Type: "AWS_PROXY"
+        IntegrationHttpMethod: "POST"
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TranslateCMLambda.Arn}/invocations'
+        IntegrationResponses:
+          - StatusCode: '200'
+      RequestParameters:
+        'method.request.querystring.bucket' : true
+        'method.request.querystring.prefix' : false
+      RequestValidatorId: !Ref APIGatewayRequestValidator
+      ResourceId: !Ref APIGatewayResource
+      RestApiId:  !Ref TranslateCMAPI
+      MethodResponses:
+        - StatusCode: 200
+    DependsOn: 
+      - APIGatewayLambdaPermission
+
+  APIGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref TranslateCMAPI
+      StageName: 'DummyStage'
+    DependsOn: APIGatewayMethod
+
+  APIGatewayAccount:
+    Type: AWS::ApiGateway::Account 
+    Properties:
+      CloudWatchRoleArn: !Sub ${ApiGatewayCloudWatchLogsRole.Arn}
+
+  APIGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref APIGatewayDeployment
+      MethodSettings:
+        -
+          DataTraceEnabled: true
+          HttpMethod: "*"
+          LoggingLevel: "INFO"
+          ResourcePath: "/*"
+      RestApiId: !Ref TranslateCMAPI
+      StageName:  "PROD"
+    DependsOn: APIGatewayAccount
+
+Outputs:
+  APIEndpoint:
+    Description: "Endpoint for Translate/Comprehend Medical Solution"
+    Value: !Sub "https://${TranslateCMAPI}.execute-api.${AWS::Region}.amazonaws.com/PROD/translateCM"
