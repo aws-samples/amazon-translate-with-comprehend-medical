@@ -8,7 +8,7 @@ template to deploy it all.  Use the steps below to deploy this code:
 * Download the contents of this repository
 * Run the makeZip.sh script in the root directory to create the zip packages for Lambda function deployment
     - NOTE: This is a bash script so ensure that you have the proper environment and permissions to run it
-* For deployment instructions, review the blog post at *insert blog post location when posted* 
+* For deployment instructions, review the blog post at https://aws.amazon.com/blogs/industries/how-to-process-medical-text-in-multiple-languages-using-amazon-translate-and-amazon-comprehend-medical/
 
 ## License
 
