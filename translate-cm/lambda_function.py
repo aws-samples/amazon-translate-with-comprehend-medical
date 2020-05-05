@@ -16,10 +16,14 @@ def lambda_handler(event, context):
 	prefix = ""
 	if "prefix" in event['queryStringParameters']:
 		prefix = event['queryStringParameters']['prefix']
+                if not prefix.endswith("/"):
+                    prefix = prefix + "/"
 	outputObj = 'results/cm_results_'+time.strftime("%Y%m%d-%H%M%S")+'.csv'
 	content = "File,Text,Category,Type,Score\n"
-	
-	list=s3.list_objects(Bucket=bucket, Prefix=prefix, Delimiter="/")
+	if "recursive" in event['queryStringParameters']:
+            list=s3.list_objects(Bucket=bucket,Prefix=prefix)
+        else:
+            list=s3.list_objects(Bucket=bucket,Prefix=prefix,Delimiter="/")
 	if "Contents" in list.keys():
 		fileList = list['Contents']
 		for s3_key in fileList:
