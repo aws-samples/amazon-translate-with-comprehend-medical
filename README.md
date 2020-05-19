@@ -18,6 +18,9 @@ The output section of the CloudFormation stack will provide you the URL for this
 * prefix: when adding prefix along with bucket, that specific "sub-folder" will have its notes processed
 * recursive (no value required): when used in conjunction with bucket or bucket and prefix, it will process all notes recursively from the specified starting location
 
+NOTE: This solution will make a high volume of calls to Amazon Translate.  Please check your Amazon Translate and request an increase to API limits if necessary.  Also,
+this solution is a sample, and intended to run on a small number of notes.  If a large quantity of notes is translated, the 30 sec timeout of API Gateway may be hit.
+
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
