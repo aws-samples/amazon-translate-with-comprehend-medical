@@ -3,8 +3,8 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 Description: Cloudformation Template for Translate/Comprehend Medical Solution
-Parameters: 
-  AllowedIPs: 
+Parameters:
+  AllowedIPs:
     Type: String
     Description: Enter the CIDR range of IPs that should be allowed access to the API
   CodeBucket:
@@ -13,7 +13,7 @@ Parameters:
 Resources:
   ResultsBucket:
     Type: AWS::S3::Bucket
-    Properties: 
+    Properties:
       AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -25,10 +25,10 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
-  
+
   AthenaBucket:
     Type: AWS::S3::Bucket
-    Properties: 
+    Properties:
       AccessControl: Private
       BucketName: !Sub ${ResultsBucket}-athenaresults
       BucketEncryption:
@@ -45,53 +45,53 @@ Resources:
 
   LambdaRole:
     Type: "AWS::IAM::Role"
-    Properties: 
-      AssumeRolePolicyDocument: 
+    Properties:
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
-        Statement: 
-          - 
+        Statement:
+          -
             Effect: "Allow"
-            Principal: 
-              Service: 
+            Principal:
+              Service:
                 - "lambda.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       Path: "/"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-  LambdaRoleS3Policy: 
+  LambdaRoleS3Policy:
     Type: "AWS::IAM::Policy"
-    Properties: 
+    Properties:
       PolicyName: "translate-cm-s3"
-      PolicyDocument: 
+      PolicyDocument:
         Version: "2012-10-17"
-        Statement: 
-          - 
+        Statement:
+          -
             Effect: "Allow"
             Action:
               - "s3:GetObject"
               - "s3:ListBucket"
             Resource: "*"
-          - 
+          -
             Effect: "Allow"
             Action: "s3:PutObject"
-            Resource: !Sub ${ResultsBucket.Arn}/*          
-      Roles: 
-        - 
+            Resource: !Sub ${ResultsBucket.Arn}/*
+      Roles:
+        -
           Ref: "LambdaRole"
-    DependsOn: 
+    DependsOn:
       - LambdaRole
       - ResultsBucket
 
-  LambdaRoleTranslatePolicy: 
+  LambdaRoleTranslatePolicy:
     Type: "AWS::IAM::Policy"
-    Properties: 
+    Properties:
       PolicyName: "translate-cm-translate-comprehend"
-      PolicyDocument: 
+      PolicyDocument:
         Version: "2012-10-17"
-        Statement: 
-          - 
+        Statement:
+          -
             Effect: "Allow"
             Action:
               - "translate:TranslateText"
@@ -99,27 +99,27 @@ Resources:
               - "cloudwatch:GetMetricStatistics"
               - "cloudwatch:ListMetrics"
             Resource: "*"
-      Roles: 
-        - 
+      Roles:
+        -
           Ref: "LambdaRole"
     DependsOn: LambdaRole
 
-  LambdaRoleComprehendMedicalPolicy: 
+  LambdaRoleComprehendMedicalPolicy:
     Type: "AWS::IAM::Policy"
-    Properties: 
+    Properties:
       PolicyName: "translate-cm-CompMedical"
-      PolicyDocument: 
+      PolicyDocument:
         Version: "2012-10-17"
-        Statement: 
-          - 
+        Statement:
+          -
             Effect: "Allow"
             Action:
               - "comprehendmedical:DetectEntitiesV2"
               - "comprehendmedical:DetectEntities"
               - "comprehendmedical:DetectPHI"
             Resource: "*"
-      Roles: 
-        - 
+      Roles:
+        -
           Ref: "LambdaRole"
     DependsOn: LambdaRole
 
@@ -134,7 +134,7 @@ Resources:
             Principal:
               Service:
                 - "apigateway.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       Policies:
         -
@@ -165,7 +165,7 @@ Resources:
             Principal:
               Service:
                 - "lambda.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       Policies:
         -
@@ -216,7 +216,7 @@ Resources:
       Handler: "lambda_function.lambda_handler"
       MemorySize: 128
       Role: !Sub ${AthenaLambdaRole.Arn}
-      Runtime: "python2.7"
+      Runtime: "python3.9"
       Timeout: 300
       Environment:
         Variables:
@@ -225,7 +225,7 @@ Resources:
       Code:
         S3Bucket: !Sub ${CodeBucket}
         S3Key: "translate-cm-athena.zip"
-    DependsOn: 
+    DependsOn:
       - AthenaLambdaRole
 
   AthenaLambdaCustomResource:
@@ -241,7 +241,7 @@ Resources:
       Handler: "lambda_function.lambda_handler"
       MemorySize: 128
       Role: !Sub ${LambdaRole.Arn}
-      Runtime: "python2.7"
+      Runtime: "python3.9"
       Timeout: 300
       Environment:
         Variables:
@@ -249,7 +249,7 @@ Resources:
       Code:
         S3Bucket: !Sub ${CodeBucket}
         S3Key: "translate-cm.zip"
-    DependsOn: 
+    DependsOn:
       - LambdaRole
       - ResultsBucket
 
@@ -285,7 +285,7 @@ Resources:
             }
           ]
         }'
-  
+
   APIGatewayLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -326,7 +326,7 @@ Resources:
       RestApiId:  !Ref TranslateCMAPI
       MethodResponses:
         - StatusCode: 200
-    DependsOn: 
+    DependsOn:
       - APIGatewayLambdaPermission
 
   APIGatewayDeployment:
@@ -337,7 +337,7 @@ Resources:
     DependsOn: APIGatewayMethod
 
   APIGatewayAccount:
-    Type: AWS::ApiGateway::Account 
+    Type: AWS::ApiGateway::Account
     Properties:
       CloudWatchRoleArn: !Sub ${ApiGatewayCloudWatchLogsRole.Arn}
 
