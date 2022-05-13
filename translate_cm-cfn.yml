@@ -14,6 +14,8 @@ Resources:
   ResultsBucket:
     Type: AWS::S3::Bucket
     Properties: 
+      VersioningConfiguration:
+        Status: Enabled
       AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -28,7 +30,9 @@ Resources:
   
   AthenaBucket:
     Type: AWS::S3::Bucket
-    Properties: 
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled 
       AccessControl: Private
       BucketName: !Sub ${ResultsBucket}-athenaresults
       BucketEncryption:
