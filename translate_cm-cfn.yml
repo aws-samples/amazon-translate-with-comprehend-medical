@@ -220,7 +220,7 @@ Resources:
       Handler: "lambda_function.lambda_handler"
       MemorySize: 128
       Role: !Sub ${AthenaLambdaRole.Arn}
-      Runtime: "python2.7"
+      Runtime: "python3.11"
       Timeout: 300
       Environment:
         Variables:
@@ -245,7 +245,7 @@ Resources:
       Handler: "lambda_function.lambda_handler"
       MemorySize: 128
       Role: !Sub ${LambdaRole.Arn}
-      Runtime: "python2.7"
+      Runtime: "python3.11"
       Timeout: 300
       Environment:
         Variables:
